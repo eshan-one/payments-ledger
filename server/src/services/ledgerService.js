@@ -42,16 +42,25 @@ export function assertBalanced(lines) {
  * Validate and persist a double-entry transaction. The whole transaction is
  * one LedgerEntry document (lines[] embedded), so a single insert is
  * atomic — it is impossible to persist half of a double-entry write.
+ *
+ * Pass `session` to fold this insert into a caller's transaction (e.g.
+ * invoiceService.applyPayment, which needs the invoice update and this
+ * ledger write to commit or roll back together).
  */
-export async function postTransaction({ description, lines, invoiceId, paymentId }) {
+export async function postTransaction({ description, lines, invoiceId, paymentId, session }) {
   assertBalanced(lines);
 
-  const entry = await LedgerEntry.create({
-    description,
-    lines,
-    ...(invoiceId && { invoiceId }),
-    ...(paymentId && { paymentId }),
-  });
+  const [entry] = await LedgerEntry.create(
+    [
+      {
+        description,
+        lines,
+        ...(invoiceId && { invoiceId }),
+        ...(paymentId && { paymentId }),
+      },
+    ],
+    { session },
+  );
 
   return entry;
 }
