@@ -1,36 +1,31 @@
 # Mini Payment Ledger & Invoice Service
 
-A small double-entry payment ledger + invoice service: Node/Express/Mongoose
-API with a React + TypeScript UI over it. Built as a scoped fintech hiring
+A small double-entry payment ledger + invoice service: a Node/Express/Mongoose
+API with a React + TypeScript UI on top. Built as a scoped fintech hiring
 exercise, prioritizing **correctness of money handling > clean architecture >
 tests > UI polish**.
 
-## Architecture summary
+Core ideas:
 
-```
-route -> controller -> service -> model
-```
+- **Double-entry ledger** — every payment posts one `LedgerEntry` with
+  balanced debit/credit lines. Account balances are **derived** by
+  aggregating ledger lines, never stored.
+- **Invoices** move `draft` → `sent` → `paid` as payments are applied against
+  them; totals are always computed server-side from line items.
+- **Idempotent payments** — a duplicate `paymentId` is a no-op, guarded at
+  the application layer and by a unique DB index (handles a webhook firing
+  twice, or two concurrent requests).
+- **Money is integer cents** everywhere; decimals only appear at the UI edges.
 
-- **server/** — Node.js (ESM) + Express + Mongoose. Routes only map URL+verb
-  to a controller; controllers parse/validate input with Zod and shape the
-  HTTP response; all business rules (double-entry balancing, idempotency,
-  invoice state machine, concurrency handling) live in `services/`, which
-  know nothing about HTTP and are unit-testable in isolation.
-- **client/** — Vite + React + TypeScript (`strict: true`). A thin, typed
-  client over the API — no business logic, no money math, just fetch +
-  render. `src/api/client.ts` is the one place that touches the raw HTTP
-  response; every component beyond it only ever sees typed data.
-- **Money** is stored and computed as integer cents everywhere. Conversion
-  to/from decimal only happens at the edges: `formatCents` (display) and
-  `parseDollarsToCents` (form input) in `client/src/lib/money.ts`, mirroring
-  `server/src/utils/money.js` on the backend.
-- **Ledger balances are derived, never stored.** An account has no balance
-  field; `GET /api/accounts/:id/balance` aggregates every `LedgerEntry` line
-  ever posted against that account.
+## Prerequisites
 
-## Running locally
+- Node.js 20+
+- A MongoDB instance (local or Atlas) — not needed for running tests, only
+  for running the server itself
 
-### Server
+## Setup
+
+### 1. Server (API)
 
 ```bash
 cd server
@@ -39,7 +34,9 @@ npm install
 npm run dev             # http://localhost:4000
 ```
 
-### Client
+### 2. Client (UI)
+
+In a second terminal:
 
 ```bash
 cd client
@@ -48,80 +45,69 @@ npm install
 npm run dev              # http://localhost:5173
 ```
 
-### Seed data
+## Using it
 
-The invoice payment flow posts against two convention accounts that must
-already exist, looked up by name:
+Open `http://localhost:5173`.
 
-```bash
-curl -X POST http://localhost:4000/api/accounts -H "Content-Type: application/json" -d '{"name":"Cash","type":"asset"}'
-curl -X POST http://localhost:4000/api/accounts -H "Content-Type: application/json" -d '{"name":"Accounts Receivable","type":"asset"}'
-```
+1. **Accounts** — on first run, use the "Required accounts" one-click setup
+   to create the `Cash` and `Accounts Receivable` accounts that payments
+   post against (or add any account manually from "Add account").
+2. **New invoice** — create an invoice with one or more line items; the
+   total is computed server-side.
+3. Open the invoice and **apply a payment** — partial or full. The invoice
+   moves `draft` → `sent` → `paid` as its balance is paid down, and the
+   **Accounts** and **Dashboard** pages reflect the new derived balances
+   immediately.
 
-Then, in the UI: create an invoice with one or more line items, open it (you
-land there automatically after creating), and apply a partial payment
-followed by a payment for the remaining balance — the invoice flips from
-`draft` → `sent` → `paid`, and the Accounts page reflects the new derived
-balances.
-
-### Tests
+## Tests
 
 ```bash
 cd server
-npm test    # Jest + Supertest + mongodb-memory-server, no live DB needed
+npm test    # Jest + Supertest + mongodb-memory-server — no live DB needed
 ```
+
+## Project layout
+
+```
+route -> controller -> service -> model
+```
+
+- **server/** — routes only map URL+verb to a controller; controllers
+  parse/validate input with Zod and shape the HTTP response; all business
+  rules (double-entry balancing, idempotency, invoice state machine,
+  concurrency handling) live in `services/`, which know nothing about HTTP.
+- **client/** — Vite + React + TypeScript (`strict: true`). `src/api/client.ts`
+  is the only place that touches the raw HTTP response; everything else only
+  sees typed data.
 
 ## The chosen edge case: concurrent payments
 
-The brief asked for one edge case handled thoroughly. We chose **concurrent
-payments racing on the same invoice** (e.g. a webhook firing twice, or two
-requests landing at once) because it's the most fintech-credible failure
-mode and builds directly on the idempotency work from Milestone 2.
-
-Two guards, stacked (`server/src/services/invoiceService.js`):
+The brief asked for one edge case handled thoroughly: **concurrent payments
+racing on the same invoice** (e.g. a webhook firing twice, or two requests
+landing at once). Two guards, stacked (`server/src/services/invoiceService.js`):
 
 1. **Optimistic lock** — `applyPayment`'s `findOneAndUpdate` re-asserts the
-   exact `amountDueCents` it just read. If another payment changed that
-   value in between, the filter no longer matches, the update is a no-op,
-   and an outer retry loop (bounded at 5 attempts) tries again against fresh
-   state instead of clobbering the other payment.
+   exact `amountDueCents` it just read. If another payment changed that value
+   in between, the update is a no-op and a bounded retry loop (5 attempts)
+   tries again against fresh state instead of clobbering the other payment.
 2. **Session transaction** — the invoice update and the ledger write commit
    or roll back together, so a failure partway through can never leave a
-   payment recorded on the invoice with no matching `LedgerEntry`.
+   payment on the invoice with no matching `LedgerEntry`.
 
-A duplicate `paymentId` (the idempotency key) is treated as a no-op at three
-layers: an in-memory check, a unique Mongo index, and a caught duplicate-key
-error if two identical requests race each other into the write itself.
-
-## What I'd do differently with more time
-
-- Add a proper account picker to the invoice payment flow instead of
-  hardcoding "Cash" / "Accounts Receivable" by name in the service — an
-  `accountId` reference on the Invoice (or a small chart-of-accounts config)
-  would be more explicit and remove the name-lookup coupling.
-- Automatic `draft`/`sent` → `overdue` transition (currently intentionally
-  skipped — status is derivable from `dueDate` but never flips on its own).
-- Optimistic UI updates and toast-style feedback in the client instead of
-  full reloads after every mutation.
-- A dedicated ledger/transactions view in the UI (the API supports posting
-  and would support listing, but Milestone 4 only asked for accounts,
-  invoices, and payments).
-- Deployment (Render/Railway + Vercel) — skipped to keep the remaining time
-  on correctness and the reflections below rather than infra.
+A duplicate `paymentId` is a no-op at three layers: an in-memory check, a
+unique Mongo index, and a caught duplicate-key error if two identical
+requests race into the write itself.
 
 ## Shortcuts taken
 
-- No auth — anyone who can reach the API can do anything. Explicitly out of
-  scope per the brief.
-- The client has no router; navigation is a small `useState` switch in
-  `App.tsx` between three views. A five-screen internal tool didn't justify
-  pulling in React Router.
-- `AccountsPage` fetches every account's balance with one request per
-  account (`Promise.all`) rather than adding a batched "balances" endpoint —
-  fine at demo scale, would not scale to a large chart of accounts.
-- No pagination anywhere (accounts list, invoice payments) — acceptable at
-  the data volumes this exercise produces.
-- Payment amount and unit price inputs are validated client-side with a
-  regex (`parseDollarsToCents`) but the server is the actual source of
-  truth; a malformed amount that somehow got past the client would still be
-  correctly rejected server-side.
+- No auth — anyone who can reach the API can do anything. Out of scope per
+  the brief.
+- No router in the client; navigation is a `useState` switch in `App.tsx`.
+- `AccountsPage` fetches each account's balance with one request per account
+  rather than a batched endpoint — fine at demo scale.
+- No pagination anywhere.
+- No deploy — time spent on correctness instead.
+
+## Further reading
+
+[`feature-specs/`](feature-specs/) has the milestone specs this was built against.
