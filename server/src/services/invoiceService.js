@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Invoice, INVOICE_STATUSES } from "../models/Invoice.js";
 import { Account } from "../models/Account.js";
 import { postTransaction } from "./ledgerService.js";
@@ -84,15 +85,26 @@ const MAX_APPLY_PAYMENT_ATTEMPTS = 5;
  *   Receivable) and record the payment, flipping status to "paid" once the
  *   remaining balance hits zero.
  *
- * Concurrency-safe by construction: the invoice update is an atomic
- * `findOneAndUpdate` whose filter re-asserts the exact amountDueCents this
- * call read. If another payment (or another attempt at this same payment)
- * changed that value in between, the filter no longer matches, the update
- * is a no-op, and we retry against the fresh state instead of clobbering
- * it. That is what stops two simultaneous payments from both consuming the
- * same remaining balance.
+ * Concurrency-safe by construction, two guards stacked together:
+ * 1. Optimistic lock — the invoice update's filter re-asserts the exact
+ *    amountDueCents this attempt read. If another payment changed that
+ *    value in between, the filter no longer matches, the update is a
+ *    no-op, and the outer loop retries against fresh state instead of
+ *    clobbering it. That is what stops two simultaneous payments from
+ *    both consuming the same remaining balance.
+ * 2. Session transaction — the invoice update and the ledger write happen
+ *    inside one `session.withTransaction`. Without this, a failure in the
+ *    ledger write (bad account lookup, dropped connection, whatever) after
+ *    the invoice was already updated would leave a payment recorded on the
+ *    invoice with no matching LedgerEntry — silently breaking the
+ *    double-entry invariant. The transaction makes the two writes commit
+ *    or roll back together, so that split-brain state can't happen.
  */
 export async function applyPayment(invoiceId, { paymentId, amountCents }) {
+  if (!Number.isInteger(amountCents) || amountCents <= 0) {
+    throw new ApiError(400, "amountCents must be a positive integer");
+  }
+
   for (let attempt = 0; attempt < MAX_APPLY_PAYMENT_ATTEMPTS; attempt += 1) {
     const invoice = await getById(invoiceId);
 
@@ -114,29 +126,6 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
     const nextStatus = remainingCents === 0 ? "paid" : "sent";
     transition(invoice, nextStatus); // validates the transition; throws 422 if illegal
 
-    // Optimistic lock: only succeeds if amountDueCents is still exactly what
-    // we just read. "payments.paymentId": { $ne } is defense-in-depth on top
-    // of the schema's unique index, for the case where two requests with the
-    // identical paymentId race each other.
-    const updated = await Invoice.findOneAndUpdate(
-      {
-        _id: invoiceId,
-        amountDueCents: invoice.amountDueCents,
-        "payments.paymentId": { $ne: paymentId },
-      },
-      {
-        $set: { amountDueCents: remainingCents, status: nextStatus },
-        $push: { payments: { paymentId, amountCents, appliedAt: new Date() } },
-      },
-      { new: true },
-    );
-
-    if (!updated) {
-      // Lost the race — the invoice changed under us. Retry against fresh
-      // state rather than failing the caller for a transient conflict.
-      continue;
-    }
-
     const [cashAccount, receivableAccount] = await Promise.all([
       Account.findOne({ name: CASH_ACCOUNT_NAME }),
       Account.findOne({ name: ACCOUNTS_RECEIVABLE_ACCOUNT_NAME }),
@@ -148,24 +137,73 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
       );
     }
 
+    const session = await mongoose.startSession();
+    let updated = null;
+    let duplicatePaymentRace = false;
+
     try {
-      await postTransaction({
-        description: `Payment ${paymentId} for invoice ${invoice._id}`,
-        lines: [
-          { accountId: cashAccount._id, direction: "debit", amountCents },
-          { accountId: receivableAccount._id, direction: "credit", amountCents },
-        ],
-        invoiceId: invoice._id,
-        paymentId,
+      await session.withTransaction(async () => {
+        // Optimistic lock: only succeeds if amountDueCents is still exactly
+        // what we just read. "payments.paymentId": { $ne } is defense-in-
+        // depth on top of the schema's unique index, for the case where two
+        // requests with the identical paymentId race each other.
+        updated = await Invoice.findOneAndUpdate(
+          {
+            _id: invoiceId,
+            amountDueCents: invoice.amountDueCents,
+            "payments.paymentId": { $ne: paymentId },
+          },
+          {
+            $set: { amountDueCents: remainingCents, status: nextStatus },
+            $push: {
+              payments: { paymentId, amountCents, appliedAt: new Date() },
+            },
+          },
+          { new: true, session },
+        );
+
+        if (!updated) {
+          // Lost the optimistic-lock race. Nothing to commit — abort this
+          // transaction (no-op) and let the outer loop retry against fresh
+          // state rather than failing the caller for a transient conflict.
+          return;
+        }
+
+        await postTransaction({
+          description: `Payment ${paymentId} for invoice ${invoice._id}`,
+          lines: [
+            { accountId: cashAccount._id, direction: "debit", amountCents },
+            {
+              accountId: receivableAccount._id,
+              direction: "credit",
+              amountCents,
+            },
+          ],
+          invoiceId: invoice._id,
+          paymentId,
+          session,
+        });
       });
     } catch (err) {
       // Concurrent duplicate paymentId raced us to the ledger's unique
       // index — treat it the same as the idempotency check above: no-op,
-      // return current state.
+      // return current state. The transaction rolled back automatically,
+      // so the invoice update from this attempt never persisted either.
       if (err?.code === 11000) {
-        return getById(invoiceId);
+        duplicatePaymentRace = true;
+      } else {
+        throw err;
       }
-      throw err;
+    } finally {
+      await session.endSession();
+    }
+
+    if (duplicatePaymentRace) {
+      return getById(invoiceId);
+    }
+
+    if (!updated) {
+      continue;
     }
 
     return updated;
