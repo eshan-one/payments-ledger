@@ -41,5 +41,5 @@ export const payInvoice = asyncHandler(async (req, res) => {
   }
 
   const invoice = await applyPayment(req.params.id, parsed.data);
-  res.status(409).json(invoice);
+  res.status(200).json(invoice);
 });
