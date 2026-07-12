@@ -1,23 +1,28 @@
 import { useEffect, useState } from "react";
-import { getInvoice } from "../api/client.ts";
+import { ApiRequestError, getInvoice } from "../api/client.ts";
 import { ApplyPaymentForm } from "../components/ApplyPaymentForm.tsx";
 import { formatCents } from "../lib/money.ts";
+import { invoiceTotalCents } from "../lib/invoiceMetrics.ts";
+import { getDisplayMessage } from "../lib/errors.ts";
 import { Card } from "../components/ui/Card.tsx";
 import { Table } from "../components/ui/Table.tsx";
 import { Badge } from "../components/ui/Badge.tsx";
+import { Button } from "../components/ui/Button.tsx";
 import { Loading, ErrorState } from "../components/ui/States.tsx";
 import type { Invoice } from "../types.ts";
 
 interface InvoiceDetailPageProps {
   invoiceId: string;
+  onBack: () => void;
 }
 
 type LoadState =
   | { status: "loading" }
+  | { status: "not-found"; invoiceId: string }
   | { status: "error"; message: string }
   | { status: "ready"; invoice: Invoice };
 
-export function InvoiceDetailPage({ invoiceId }: InvoiceDetailPageProps) {
+export function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPageProps) {
   const [state, setState] = useState<LoadState>({ status: "loading" });
 
   useEffect(() => {
@@ -30,10 +35,11 @@ export function InvoiceDetailPage({ invoiceId }: InvoiceDetailPageProps) {
       })
       .catch((err: unknown) => {
         if (cancelled) return;
-        setState({
-          status: "error",
-          message: err instanceof Error ? err.message : "Failed to load invoice",
-        });
+        if (err instanceof ApiRequestError && err.status === 404) {
+          setState({ status: "not-found", invoiceId });
+          return;
+        }
+        setState({ status: "error", message: getDisplayMessage(err) });
       });
 
     return () => {
@@ -49,6 +55,25 @@ export function InvoiceDetailPage({ invoiceId }: InvoiceDetailPageProps) {
     );
   }
 
+  if (state.status === "not-found") {
+    return (
+      <Card>
+        <div className="state state--error">
+          <span className="state__icon--error" aria-hidden="true">!</span>
+          <h3 style={{ margin: 0, fontSize: "17px", fontWeight: 600, color: "var(--text)" }}>
+            Invoice not found
+          </h3>
+          <p className="state--error">
+            No invoice found for "{state.invoiceId}". Check the ID and try again.
+          </p>
+          <Button variant="secondary" onClick={onBack}>
+            Back to invoices
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
   if (state.status === "error") {
     return (
       <Card>
@@ -58,22 +83,21 @@ export function InvoiceDetailPage({ invoiceId }: InvoiceDetailPageProps) {
   }
 
   const { invoice } = state;
-  const totalCents = invoice.lineItems.reduce(
-    (total, item) => total + item.quantity * item.unitPriceCents,
-    0,
-  );
+  const totalCents = invoiceTotalCents(invoice);
 
   return (
     <>
-      <header className="page__head">
-        <div>
-          <h1 className="page__title">Invoice</h1>
-          <p className="page__subtitle mono">{invoice._id}</p>
-        </div>
+      <div className="detail-head">
+        <Button variant="ghost" onClick={onBack}>
+          ← Invoices
+        </Button>
         <Badge status={invoice.status} />
-      </header>
+      </div>
 
-      <Card title="Summary">
+      <Card
+        title={<span className="mono">{invoice._id}</span>}
+        action={<span className="card__meta">Created {new Date(invoice.createdAt).toLocaleDateString()}</span>}
+      >
         <div className="meta">
           <div>
             <p className="meta__label">Invoice total</p>
@@ -156,21 +180,26 @@ export function InvoiceDetailPage({ invoiceId }: InvoiceDetailPageProps) {
         )}
       </Card>
 
-      {invoice.status !== "paid" ? (
-        <Card title="Apply payment">
+      {invoice.status === "paid" && (
+        <Card>
+          <div className="paid-banner">
+            <Badge status="paid" />
+            <span>This invoice has been paid in full.</span>
+          </div>
+        </Card>
+      )}
+
+      {invoice.status !== "paid" && (
+        <Card
+          title="Apply payment"
+          action={<span className="remaining-pill num">Remaining {formatCents(invoice.amountDueCents)}</span>}
+        >
           <ApplyPaymentForm
             invoiceId={invoice._id}
             onApplied={(updated) =>
               setState({ status: "ready", invoice: updated })
             }
           />
-        </Card>
-      ) : (
-        <Card>
-          <div className="state">
-            <Badge status="paid" />
-            <span>This invoice has been paid in full.</span>
-          </div>
         </Card>
       )}
     </>

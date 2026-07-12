@@ -1,4 +1,3 @@
-import mongoose from "mongoose";
 import { LedgerEntry } from "../models/LedgerEntry.js";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -73,7 +72,7 @@ export async function postTransaction({ description, lines, invoiceId, paymentId
 export async function getBalance(accountId) {
   const result = await LedgerEntry.aggregate([
     { $unwind: "$lines" },
-    { $match: { "lines.accountId": new mongoose.Types.ObjectId(accountId) } },
+    { $match: { "lines.accountId": accountId } },
     {
       $group: {
         _id: null,

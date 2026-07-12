@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { applyPayment } from "../api/client.ts";
 import { parseDollarsToCents } from "../lib/money.ts";
+import { getDisplayMessage } from "../lib/errors.ts";
 import { Input } from "./ui/Input.tsx";
 import { Button } from "./ui/Button.tsx";
 import type { Invoice } from "../types.ts";
@@ -39,7 +40,7 @@ export function ApplyPaymentForm({ invoiceId, onApplied }: ApplyPaymentFormProps
       setAmount("");
       onApplied(invoice);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to apply payment");
+      setError(getDisplayMessage(err));
     } finally {
       setSubmitting(false);
     }

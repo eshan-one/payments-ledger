@@ -1,8 +1,24 @@
 import mongoose from "mongoose";
 import { Invoice, INVOICE_STATUSES } from "../models/Invoice.js";
 import { Account } from "../models/Account.js";
+import { Counter } from "../models/Counter.js";
 import { postTransaction } from "./ledgerService.js";
 import { ApiError } from "../utils/ApiError.js";
+import { formatCents } from "../utils/money.js";
+
+// Invoice numbers start at INV-1001 — a $inc on a single counter document
+// is one atomic write, so concurrent creates can never collide on a number.
+const INVOICE_ID_PREFIX = "INV-";
+const INVOICE_ID_START = 1000;
+
+async function nextInvoiceId() {
+  const counter = await Counter.findByIdAndUpdate(
+    "invoice",
+    { $inc: { seq: 1 } },
+    { new: true, upsert: true },
+  );
+  return `${INVOICE_ID_PREFIX}${INVOICE_ID_START + counter.seq}`;
+}
 
 // Convention accounts a payment posts against. They must already exist
 // (created via POST /api/accounts, Milestone 1) — invoiceService looks them
@@ -50,8 +66,10 @@ function computeTotalCents(lineItems) {
  */
 export async function create({ lineItems, dueDate }) {
   const amountDueCents = computeTotalCents(lineItems);
+  const _id = await nextInvoiceId();
 
   const invoice = await Invoice.create({
+    _id,
     lineItems,
     amountDueCents,
     dueDate,
@@ -62,11 +80,18 @@ export async function create({ lineItems, dueDate }) {
 }
 
 export async function getById(invoiceId) {
+  // _id is a plain String field (not ObjectId), so an unknown id just finds
+  // nothing rather than throwing a cast error — no format check needed.
   const invoice = await Invoice.findById(invoiceId);
   if (!invoice) {
     throw new ApiError(404, "Invoice not found");
   }
   return invoice;
+}
+
+/** Every invoice, newest first — backs the dashboard and invoice-list views. */
+export async function list() {
+  return Invoice.find().sort({ createdAt: -1 });
 }
 
 // Read-modify-write on amountDueCents is unsafe: two concurrent payments can
@@ -116,9 +141,10 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
     }
 
     if (amountCents > invoice.amountDueCents) {
+      // User-facing message: dollars, not the internal cents representation.
       throw new ApiError(
         422,
-        `Overpayment: amountCents (${amountCents}) exceeds amount due (${invoice.amountDueCents})`,
+        `Overpayment: $${formatCents(amountCents)} exceeds the remaining balance of $${formatCents(invoice.amountDueCents)}`,
       );
     }
 

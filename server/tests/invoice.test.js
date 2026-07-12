@@ -1,7 +1,7 @@
 import supertest from "supertest";
 import { connect, clearDatabase, closeDatabase } from "./setup.js";
 import { createApp } from "../src/app.js";
-import { Account } from "../src/models/Account.js";
+import { create as createAccount } from "../src/services/accountService.js";
 import { create as createInvoice, applyPayment } from "../src/services/invoiceService.js";
 import { ApiError } from "../src/utils/ApiError.js";
 
@@ -21,8 +21,8 @@ afterAll(async () => {
 
 async function seedAccounts() {
   await Promise.all([
-    Account.create({ name: "Cash", type: "asset" }),
-    Account.create({ name: "Accounts Receivable", type: "asset" }),
+    createAccount({ name: "Cash", type: "asset" }),
+    createAccount({ name: "Accounts Receivable", type: "asset" }),
   ]);
 }
 
@@ -117,5 +117,48 @@ describe("POST /api/invoices/:id/payments", () => {
     expect(res.status).toBe(200);
     expect(res.body.amountDueCents).toBe(0);
     expect(res.body.status).toBe("paid");
+  });
+});
+
+describe("GET /api/invoices/:id", () => {
+  it("returns 404 (not 500) for an unknown id", async () => {
+    const res = await supertest(app).get("/api/invoices/not-a-real-invoice");
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Invoice not found");
+  });
+});
+
+describe("invoiceService.create — invoice ids", () => {
+  it("assigns human-readable, sequential, unique ids", async () => {
+    const first = await seedInvoice(1000);
+    const second = await seedInvoice(1000);
+
+    expect(first._id).toMatch(/^INV-\d+$/);
+    expect(second._id).toMatch(/^INV-\d+$/);
+    expect(first._id).not.toBe(second._id);
+  });
+});
+
+describe("GET /api/invoices", () => {
+  it("returns every invoice, newest first", async () => {
+    const older = await seedInvoice(1000);
+    const newer = await seedInvoice(2000);
+
+    const res = await supertest(app).get("/api/invoices");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body.map((inv) => inv._id)).toEqual([
+      String(newer._id),
+      String(older._id),
+    ]);
+  });
+
+  it("returns an empty array when there are no invoices", async () => {
+    const res = await supertest(app).get("/api/invoices");
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([]);
   });
 });

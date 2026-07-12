@@ -42,6 +42,12 @@ const paymentSchema = new mongoose.Schema(
 // balance duplicating the ledger.
 const invoiceSchema = new mongoose.Schema(
   {
+    // Human-readable id (e.g. "INV-1001") instead of the default ObjectId —
+    // this is what's shown to users and looked up by, so it should read as
+    // an invoice number. Assigned by invoiceService.create via the Counter
+    // model; overriding the type to String disables Mongoose's automatic
+    // ObjectId generation.
+    _id: { type: String },
     lineItems: {
       type: [lineItemSchema],
       required: true,
