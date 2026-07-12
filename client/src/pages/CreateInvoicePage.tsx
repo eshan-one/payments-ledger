@@ -6,6 +6,7 @@ import {
   type DraftLineItem,
 } from "../components/LineItemsEditor.tsx";
 import { parseDollarsToCents } from "../lib/money.ts";
+import { getDisplayMessage } from "../lib/errors.ts";
 import { Card } from "../components/ui/Card.tsx";
 import { Input } from "../components/ui/Input.tsx";
 import { Button } from "../components/ui/Button.tsx";
@@ -64,7 +65,7 @@ export function CreateInvoicePage({ onCreated }: CreateInvoicePageProps) {
       const invoice = await createInvoice({ lineItems, dueDate });
       onCreated(invoice._id);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create invoice");
+      setError(getDisplayMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -72,16 +73,7 @@ export function CreateInvoicePage({ onCreated }: CreateInvoicePageProps) {
 
   return (
     <>
-      <header className="page__head">
-        <div>
-          <h1 className="page__title">New invoice</h1>
-          <p className="page__subtitle">
-            The total is computed server-side from the line items.
-          </p>
-        </div>
-      </header>
-
-      <Card title="Line items">
+      <Card title="Line items" action={<span className="card__meta">Totals are computed from unit price × quantity</span>}>
         <form className="form" onSubmit={handleSubmit}>
           <LineItemsEditor items={items} onChange={setItems} />
 

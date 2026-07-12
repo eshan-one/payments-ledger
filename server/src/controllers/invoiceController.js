@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { create, getById, applyPayment } from "../services/invoiceService.js";
+import { create, getById, applyPayment, list } from "../services/invoiceService.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 
@@ -27,6 +27,11 @@ export const createInvoice = asyncHandler(async (req, res) => {
 
   const invoice = await create(parsed.data);
   res.status(201).json(invoice);
+});
+
+export const listInvoices = asyncHandler(async (req, res) => {
+  const invoices = await list();
+  res.status(200).json(invoices);
 });
 
 export const getInvoice = asyncHandler(async (req, res) => {

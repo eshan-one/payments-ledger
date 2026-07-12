@@ -37,6 +37,20 @@ export function listAccounts(): Promise<Account[]> {
   return request<Account[]>("/api/accounts");
 }
 
+// Single-currency for now — the server ignores/always defaults to USD
+// regardless of what's sent, so the client doesn't offer a currency field.
+export interface CreateAccountInput {
+  name: string;
+  type: Account["type"];
+}
+
+export function createAccount(input: CreateAccountInput): Promise<Account> {
+  return request<Account>("/api/accounts", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export function getAccountBalance(accountId: string): Promise<AccountBalance> {
   return request<AccountBalance>(`/api/accounts/${accountId}/balance`);
 }
@@ -51,6 +65,10 @@ export function createInvoice(input: CreateInvoiceInput): Promise<Invoice> {
     method: "POST",
     body: JSON.stringify(input),
   });
+}
+
+export function listInvoices(): Promise<Invoice[]> {
+  return request<Invoice[]>("/api/invoices");
 }
 
 export function getInvoice(invoiceId: string): Promise<Invoice> {

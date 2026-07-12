@@ -1,14 +1,11 @@
 import { z } from "zod";
-import mongoose from "mongoose";
 import { Account } from "../models/Account.js";
 import { postTransaction } from "../services/ledgerService.js";
 import { asyncHandler } from "../middleware/errorHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 
 const lineSchema = z.object({
-  accountId: z.string().refine((id) => mongoose.isValidObjectId(id), {
-    message: "accountId must be a valid id",
-  }),
+  accountId: z.string().trim().min(1),
   direction: z.enum(["debit", "credit"]),
   amountCents: z.number().int().positive(),
 });

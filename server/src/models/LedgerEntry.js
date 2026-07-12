@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 
 const lineSchema = new mongoose.Schema(
   {
-    accountId: { type: mongoose.Schema.Types.ObjectId, ref: "Account", required: true },
+    accountId: { type: String, ref: "Account", required: true },
     direction: { type: String, required: true, enum: ["debit", "credit"] },
     amountCents: {
       type: Number,
@@ -31,7 +31,7 @@ const ledgerEntrySchema = new mongoose.Schema(
         message: "lines must contain at least 2 entries",
       },
     },
-    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: "Invoice" },
+    invoiceId: { type: String, ref: "Invoice" },
     paymentId: { type: String },
   },
   { timestamps: true }

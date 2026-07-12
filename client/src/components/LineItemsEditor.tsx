@@ -49,44 +49,55 @@ export function LineItemsEditor({ items, onChange }: LineItemsEditorProps) {
         <span>Description</span>
         <span>Qty</span>
         <span>Unit price</span>
+        <span>Line total</span>
         <span />
       </div>
 
-      {items.map((item, index) => (
-        <div className="line-items__row" key={index}>
-          <Input
-            label="Description"
-            placeholder="e.g. Consulting hours"
-            value={item.description}
-            onChange={(e) => updateItem(index, { description: e.target.value })}
-          />
-          <Input
-            label="Quantity"
-            type="number"
-            min={1}
-            step={1}
-            placeholder="Qty"
-            value={item.quantity}
-            onChange={(e) => updateItem(index, { quantity: e.target.value })}
-          />
-          <Input
-            label="Unit price"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={item.unitPrice}
-            onChange={(e) => updateItem(index, { unitPrice: e.target.value })}
-          />
-          <Button
-            variant="danger"
-            size="sm"
-            onClick={() => removeItem(index)}
-            disabled={items.length <= 1}
-            aria-label={`Remove line item ${index + 1}`}
-          >
-            Remove
-          </Button>
-        </div>
-      ))}
+      {items.map((item, index) => {
+        const quantity = Number(item.quantity);
+        const unitPriceCents = parseDollarsToCents(item.unitPrice);
+        const lineCents =
+          Number.isInteger(quantity) && quantity > 0 && unitPriceCents !== null
+            ? quantity * unitPriceCents
+            : 0;
+
+        return (
+          <div className="line-items__row" key={index}>
+            <Input
+              label="Description"
+              placeholder="e.g. Consulting hours"
+              value={item.description}
+              onChange={(e) => updateItem(index, { description: e.target.value })}
+            />
+            <Input
+              label="Quantity"
+              type="number"
+              min={1}
+              step={1}
+              placeholder="Qty"
+              value={item.quantity}
+              onChange={(e) => updateItem(index, { quantity: e.target.value })}
+            />
+            <Input
+              label="Unit price"
+              inputMode="decimal"
+              placeholder="0.00"
+              value={item.unitPrice}
+              onChange={(e) => updateItem(index, { unitPrice: e.target.value })}
+            />
+            <span className="line-items__row-total num">{formatCents(lineCents)}</span>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => removeItem(index)}
+              disabled={items.length <= 1}
+              aria-label={`Remove line item ${index + 1}`}
+            >
+              Remove
+            </Button>
+          </div>
+        );
+      })}
 
       <div className="line-items__foot">
         <Button variant="secondary" size="sm" onClick={addItem}>

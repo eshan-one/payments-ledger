@@ -1,6 +1,6 @@
 import { connect, clearDatabase, closeDatabase } from "./setup.js";
-import { Account } from "../src/models/Account.js";
 import { LedgerEntry } from "../src/models/LedgerEntry.js";
+import { create as createAccount } from "../src/services/accountService.js";
 import { postTransaction, getBalance } from "../src/services/ledgerService.js";
 import { ApiError } from "../src/utils/ApiError.js";
 
@@ -18,8 +18,8 @@ afterAll(async () => {
 
 async function createAccounts() {
   const [cash, revenue] = await Promise.all([
-    Account.create({ name: "Cash", type: "asset" }),
-    Account.create({ name: "Revenue", type: "revenue" }),
+    createAccount({ name: "Cash", type: "asset" }),
+    createAccount({ name: "Revenue", type: "revenue" }),
   ]);
   return { cash, revenue };
 }
