@@ -77,7 +77,7 @@ move it to the service.
 ## How To Work (workflow)
 
 - Implement **one milestone at a time**, only the current one. Do not jump ahead.
-- Read the milestone spec in `feature-specs/` and implement exactly what it says.
+- Read the milestone spec in `context/feature-specs/` and implement exactly what it says.
 - After implementing, **explain the approach**: what was built, the key
   concepts, and why this design over the alternatives. The developer is
   learning — teach at each decision point, concisely.
