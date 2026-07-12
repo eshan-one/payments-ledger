@@ -13,7 +13,7 @@ const ACCOUNTS_RECEIVABLE_ACCOUNT_NAME = "Accounts Receivable";
 // but nothing transitions into it automatically (see spec: "skip automatic
 // overdue transition; leave it derivable from dueDate").
 const ALLOWED_TRANSITIONS = {
-  draft: ["sent"],
+  draft: ["sent", "paid"],
   sent: ["paid", "overdue"],
   paid: [],
   overdue: ["paid"],
@@ -25,7 +25,10 @@ export function transition(invoice, nextStatus) {
 
   const allowed = ALLOWED_TRANSITIONS[invoice.status] ?? [];
   if (!allowed.includes(nextStatus)) {
-    throw new ApiError(422, `Cannot transition invoice from ${invoice.status} to ${nextStatus}`);
+    throw new ApiError(
+      422,
+      `Cannot transition invoice from ${invoice.status} to ${nextStatus}`,
+    );
   }
 
   invoice.status = nextStatus;
@@ -34,7 +37,10 @@ export function transition(invoice, nextStatus) {
 
 /** Sum of quantity * unitPriceCents across every line item — the invoice total. */
 function computeTotalCents(lineItems) {
-  return lineItems.reduce((total, item) => total + item.quantity * item.unitPriceCents, 0);
+  return lineItems.reduce(
+    (total, item) => total + item.quantity * item.unitPriceCents,
+    0,
+  );
 }
 
 /**
@@ -74,7 +80,9 @@ export async function getById(invoiceId) {
 export async function applyPayment(invoiceId, { paymentId, amountCents }) {
   const invoice = await getById(invoiceId);
 
-  const alreadyApplied = invoice.payments.some((payment) => payment.paymentId === paymentId);
+  const alreadyApplied = invoice.payments.some(
+    (payment) => payment.paymentId === paymentId,
+  );
   if (alreadyApplied) {
     return invoice;
   }
@@ -82,7 +90,7 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
   if (amountCents > invoice.amountDueCents) {
     throw new ApiError(
       422,
-      `Overpayment: amountCents (${amountCents}) exceeds amount due (${invoice.amountDueCents})`
+      `Overpayment: amountCents (${amountCents}) exceeds amount due (${invoice.amountDueCents})`,
     );
   }
 
@@ -93,7 +101,7 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
   if (!cashAccount || !receivableAccount) {
     throw new ApiError(
       404,
-      `Required accounts not found: expected "${CASH_ACCOUNT_NAME}" and "${ACCOUNTS_RECEIVABLE_ACCOUNT_NAME}" accounts to exist`
+      `Required accounts not found: expected "${CASH_ACCOUNT_NAME}" and "${ACCOUNTS_RECEIVABLE_ACCOUNT_NAME}" accounts to exist`,
     );
   }
 
