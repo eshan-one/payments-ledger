@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import accountRoutes from "./routes/accountRoutes.js";
 import ledgerRoutes from "./routes/ledgerRoutes.js";
+import invoiceRoutes from "./routes/invoiceRoutes.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 export function createApp() {
@@ -14,6 +15,7 @@ export function createApp() {
 
   app.use("/api/accounts", accountRoutes);
   app.use("/api/ledger", ledgerRoutes);
+  app.use("/api/invoices", invoiceRoutes);
 
   // Must be mounted last — catches every thrown/rejected error from routes.
   app.use(errorHandler);
