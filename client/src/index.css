@@ -1,0 +1,667 @@
+/* =========================================================================
+   Mini Payment Ledger — design system (Kite-inspired)
+   Calm, precise, data-first. One accent (blue). Green/red only for balances.
+   All spacing uses a 4/8/12/16/24/32 scale via the --space-* tokens.
+   ========================================================================= */
+
+:root {
+  /* Neutrals — near-white canvas, white surfaces, dark slate text */
+  --bg: #f7f8fa;
+  --surface: #ffffff;
+  --surface-muted: #f9fafb;
+  --text: #1f2430;
+  --text-muted: #6b7280;
+  --text-faint: #9aa1ad;
+  --border: #e6e8ec;
+  --border-strong: #d7dae0;
+
+  /* One accent — a calm Kite-like blue, used sparingly */
+  --accent: #2f6fed;
+  --accent-hover: #295fce;
+  --accent-soft: #eaf1fe;
+  --accent-ring: rgba(47, 111, 237, 0.35);
+
+  /* Semantics — reserved for money direction and errors */
+  --pos: #12855f;
+  --neg: #c2384a;
+  --error: #c2384a;
+  --error-soft: #fdecee;
+
+  /* Status pills */
+  --draft-bg: #eef0f3;   --draft-fg: #55606f;
+  --sent-bg: #eaf1fe;    --sent-fg: #2f6fed;
+  --paid-bg: #e6f5ee;    --paid-fg: #12855f;
+  --overdue-bg: #fdecee; --overdue-fg: #c2384a;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.04);
+
+  font: 15px/1.55 "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1116;
+    --surface: #161922;
+    --surface-muted: #1b1f29;
+    --text: #e6e8ee;
+    --text-muted: #9aa1ad;
+    --text-faint: #6b7280;
+    --border: #262b36;
+    --border-strong: #333944;
+
+    --accent: #6ea0ff;
+    --accent-hover: #86b0ff;
+    --accent-soft: #1a2740;
+    --accent-ring: rgba(110, 160, 255, 0.4);
+
+    --pos: #3fbf8f;
+    --neg: #f0808f;
+    --error: #f0808f;
+    --error-soft: #2a1a1e;
+
+    --draft-bg: #232833;   --draft-fg: #aab2bf;
+    --sent-bg: #1a2740;    --sent-fg: #86b0ff;
+    --paid-bg: #16281f;    --paid-fg: #3fbf8f;
+    --overdue-bg: #2a1a1e; --overdue-fg: #f0808f;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* Tabular figures so columns of money line up cleanly. */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* -------------------------------------------------------------- App shell */
+
+.app {
+  min-height: 100vh;
+}
+
+.topnav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-6);
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  backdrop-filter: saturate(1.1) blur(6px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topnav__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin-right: var(--space-2);
+}
+
+.topnav__mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: linear-gradient(150deg, var(--accent), var(--accent-hover));
+  box-shadow: var(--shadow-sm);
+}
+
+.topnav__links {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.navlink {
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 550;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.navlink:hover {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.navlink.active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.topnav__spacer {
+  margin-left: auto;
+}
+
+.lookup {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.lookup .input {
+  width: 200px;
+}
+
+.page {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) 64px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.page__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.page__title {
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.page__subtitle {
+  color: var(--text-muted);
+  margin: var(--space-1) 0 0;
+  font-size: 14px;
+}
+
+/* ---------------------------------------------------------------- Buttons */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 560;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+  white-space: nowrap;
+}
+
+.btn--sm {
+  padding: 6px var(--space-3);
+  font-size: 13px;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: #fff;
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn--secondary {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+.btn--secondary:hover:not(:disabled) {
+  background: var(--surface-muted);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--text-muted);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.btn--danger {
+  background: transparent;
+  border-color: var(--border-strong);
+  color: var(--neg);
+}
+.btn--danger:hover:not(:disabled) {
+  background: var(--error-soft);
+  border-color: var(--neg);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ------------------------------------------------------------------ Cards */
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+}
+
+.card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--border);
+}
+
+.card__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.card__body {
+  padding: var(--space-6);
+}
+
+/* Let tables sit flush inside a card body. */
+.card__body:has(> .table-wrap) {
+  padding: 0;
+}
+
+/* ------------------------------------------------------------ Summary grid */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--space-4);
+}
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-4) var(--space-6);
+  box-shadow: var(--shadow-sm);
+}
+
+.stat__label {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 550;
+  margin: 0 0 var(--space-2);
+}
+
+.stat__value {
+  font-size: 26px;
+  font-weight: 640;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.stat__value.pos { color: var(--pos); }
+.stat__value.neg { color: var(--neg); }
+
+/* ----------------------------------------------------------------- Tables */
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: var(--space-3) var(--space-6);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.table thead th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  background: var(--surface-muted);
+  position: sticky;
+  top: 0;
+}
+
+.table tbody tr {
+  transition: background 0.1s ease;
+}
+
+.table tbody tr:hover {
+  background: var(--surface-muted);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Right-align money columns and give them tabular figures. */
+.table .amount {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+.table tfoot td {
+  padding: var(--space-3) var(--space-6);
+  font-weight: 600;
+  border-top: 1px solid var(--border-strong);
+}
+
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+
+/* Muted monospace for opaque ids. */
+.mono {
+  font-family: "SF Mono", "Cascadia Code", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ----------------------------------------------------------------- Badges */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge--draft   { background: var(--draft-bg);   color: var(--draft-fg); }
+.badge--sent    { background: var(--sent-bg);    color: var(--sent-fg); }
+.badge--paid    { background: var(--paid-bg);    color: var(--paid-fg); }
+.badge--overdue { background: var(--overdue-bg); color: var(--overdue-fg); }
+
+/* ----------------------------------------------------------------- Fields */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.field__label {
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--text-muted);
+}
+
+.input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+.input:hover {
+  border-color: var(--text-faint);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+.input[aria-invalid="true"] {
+  border-color: var(--neg);
+}
+
+.field__hint {
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.field__hint--error {
+  color: var(--error);
+}
+
+.field--date {
+  max-width: 240px;
+}
+
+/* Compact inline error for form validation (distinct from the full-block
+   ErrorState used for failed data loads). */
+.form-error {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--error-soft);
+  color: var(--error);
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+/* Visible focus ring for every interactive element (keyboard accessibility). */
+.btn:focus-visible,
+.navlink:focus-visible,
+.input:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* ------------------------------------------------------- Forms & line items */
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.form__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.line-items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.line-items__row {
+  display: grid;
+  grid-template-columns: 1fr 90px 150px auto;
+  gap: var(--space-3);
+  align-items: end;
+}
+
+.line-items__head {
+  display: grid;
+  grid-template-columns: 1fr 90px 150px auto;
+  gap: var(--space-3);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+/* The visible head row names the columns, so hide the per-row field labels
+   for sighted users while keeping them for screen readers. */
+.line-items__row .field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.line-items__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+}
+
+.line-items__total {
+  font-weight: 640;
+  font-size: 17px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pay-panel__row {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.pay-panel__row .field {
+  flex: 1;
+  min-width: 180px;
+}
+
+/* Key/value description grid for the invoice meta block. */
+.meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-4);
+}
+
+.meta__label {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 var(--space-1);
+}
+
+.meta__value {
+  font-size: 16px;
+  font-weight: 560;
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------ Empty/errors */
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: var(--space-8);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.state--error {
+  color: var(--error);
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent);
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* --------------------------------------------------------------- Responsive */
+
+@media (max-width: 720px) {
+  .topnav {
+    padding: var(--space-3) var(--space-4);
+  }
+  .lookup .input {
+    width: 140px;
+  }
+  .page {
+    padding: var(--space-6) var(--space-4) 48px;
+  }
+  .line-items__head {
+    display: none;
+  }
+  .line-items__row {
+    grid-template-columns: 1fr 1fr;
+  }
+  /* Head row is hidden here — bring the per-field labels back into view. */
+  .line-items__row .field__label {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    clip: auto;
+    overflow: visible;
+  }
+}
