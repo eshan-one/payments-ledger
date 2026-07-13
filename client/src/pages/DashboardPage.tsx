@@ -12,6 +12,7 @@ import {
   computeDashboardMetrics,
   collectedByMonth,
   invoiceTotalCents,
+  displayStatus,
 } from "../lib/invoiceMetrics.ts";
 import type { Invoice } from "../types.ts";
 
@@ -192,7 +193,7 @@ export function DashboardPage({ onSelectInvoice, onCreateInvoice, onViewAllInvoi
                   >
                     <td className="mono">{invoice._id}</td>
                     <td>
-                      <Badge status={invoice.status} />
+                      <Badge status={displayStatus(invoice)} />
                     </td>
                     <td>{new Date(invoice.dueDate).toLocaleDateString()}</td>
                     <td className="amount">{formatCents(invoiceTotalCents(invoice))}</td>

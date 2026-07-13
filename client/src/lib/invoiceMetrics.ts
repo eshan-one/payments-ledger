@@ -33,8 +33,9 @@ export function computeDashboardMetrics(invoices: Invoice[]): DashboardMetrics {
   for (const invoice of invoices) {
     invoicedCents += invoiceTotalCents(invoice);
     outstandingCents += invoice.amountDueCents;
-    counts[invoice.status] += 1;
-    if (invoice.status === "overdue") overdueCents += invoice.amountDueCents;
+    const status = displayStatus(invoice);
+    counts[status] += 1;
+    if (status === "overdue") overdueCents += invoice.amountDueCents;
   }
 
   return {
@@ -87,6 +88,22 @@ export function isDueSoon(invoice: Invoice): boolean {
   if (invoice.status !== "sent") return false;
   const msUntilDue = new Date(invoice.dueDate).getTime() - Date.now();
   return msUntilDue > 0 && msUntilDue < DUE_SOON_WINDOW_MS;
+}
+
+// The server never transitions an invoice to "overdue" — that status is
+// derived client-side from dueDate rather than stored, so it can never go
+// stale. isOverdue/displayStatus are the one place that derivation happens;
+// everywhere the UI shows or counts invoice status should go through
+// displayStatus rather than reading invoice.status directly.
+
+/** True when a sent invoice's due date has already passed. */
+export function isOverdue(invoice: Invoice): boolean {
+  return invoice.status === "sent" && new Date(invoice.dueDate).getTime() < Date.now();
+}
+
+/** The status to show in the UI: invoice.status, except overdue sent invoices read as "overdue". */
+export function displayStatus(invoice: Invoice): InvoiceStatus {
+  return isOverdue(invoice) ? "overdue" : invoice.status;
 }
 
 export { STATUSES as INVOICE_STATUSES };

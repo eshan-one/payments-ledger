@@ -7,7 +7,7 @@ import { Button } from "../components/ui/Button.tsx";
 import { Loading, ErrorState, EmptyState } from "../components/ui/States.tsx";
 import { formatCents } from "../lib/money.ts";
 import { getDisplayMessage } from "../lib/errors.ts";
-import { INVOICE_STATUSES, invoiceTotalCents, isDueSoon } from "../lib/invoiceMetrics.ts";
+import { INVOICE_STATUSES, invoiceTotalCents, isDueSoon, displayStatus } from "../lib/invoiceMetrics.ts";
 import type { Invoice, InvoiceStatus } from "../types.ts";
 
 interface InvoicesPageProps {
@@ -70,13 +70,13 @@ export function InvoicesPage({ onSelectInvoice, onCreateInvoice }: InvoicesPageP
 
   const { invoices } = state;
   const filters: Filter[] = ["all", ...INVOICE_STATUSES];
-  const filtered = filter === "all" ? invoices : invoices.filter((inv) => inv.status === filter);
+  const filtered = filter === "all" ? invoices : invoices.filter((inv) => displayStatus(inv) === filter);
 
   return (
     <>
       <div className="filter-row">
         {filters.map((f) => {
-          const count = f === "all" ? invoices.length : invoices.filter((inv) => inv.status === f).length;
+          const count = f === "all" ? invoices.length : invoices.filter((inv) => displayStatus(inv) === f).length;
           return (
             <button
               key={f}
@@ -125,7 +125,7 @@ export function InvoicesPage({ onSelectInvoice, onCreateInvoice }: InvoicesPageP
                 >
                   <td className="mono">{invoice._id}</td>
                   <td>
-                    <Badge status={invoice.status} />
+                    <Badge status={displayStatus(invoice)} />
                   </td>
                   <td>
                     {new Date(invoice.dueDate).toLocaleDateString()}
