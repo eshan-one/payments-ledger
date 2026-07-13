@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { ApiRequestError, getInvoice } from "../api/client.ts";
 import { ApplyPaymentForm } from "../components/ApplyPaymentForm.tsx";
 import { formatCents } from "../lib/money.ts";
-import { invoiceTotalCents } from "../lib/invoiceMetrics.ts";
+import { invoiceTotalCents, displayStatus } from "../lib/invoiceMetrics.ts";
 import { getDisplayMessage } from "../lib/errors.ts";
 import { Card } from "../components/ui/Card.tsx";
 import { Table } from "../components/ui/Table.tsx";
@@ -91,7 +91,7 @@ export function InvoiceDetailPage({ invoiceId, onBack }: InvoiceDetailPageProps)
         <Button variant="ghost" onClick={onBack}>
           ← Invoices
         </Button>
-        <Badge status={invoice.status} />
+        <Badge status={displayStatus(invoice)} />
       </div>
 
       <Card

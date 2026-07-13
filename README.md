@@ -107,7 +107,3 @@ requests race into the write itself.
   rather than a batched endpoint — fine at demo scale.
 - No pagination anywhere.
 - No deploy — time spent on correctness instead.
-
-## Further reading
-
-[`feature-specs/`](feature-specs/) has the milestone specs this was built against.
