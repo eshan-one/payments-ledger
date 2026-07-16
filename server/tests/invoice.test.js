@@ -76,9 +76,7 @@ describe("invoiceService.applyPayment", () => {
     await seedAccounts();
     const invoice = await seedInvoice(1000);
 
-    // Neither payment overpays 1000 on its own, but together they do —
-    // a naive read-modify-write would let both succeed and drive the
-    // invoice to a negative remaining balance.
+    // Neither payment overpays alone, but together they would without the lock.
     const paymentIds = ["race-a", "race-b"];
     const results = await Promise.allSettled(
       paymentIds.map((paymentId) =>
@@ -96,9 +94,7 @@ describe("invoiceService.applyPayment", () => {
     expect(rejected[0].reason.status).toBe(422);
     expect(fulfilled[0].value.amountDueCents).toBe(300);
 
-    // The invoice's final state must agree with exactly one payment applied —
-    // no double-spend of the original 1000 remaining balance. Replaying the
-    // winning paymentId must stay idempotent rather than re-throwing.
+    // Replaying the winning paymentId must stay idempotent, not re-throw.
     const final = await applyPayment(invoice._id, { paymentId: winnerPaymentId, amountCents: 700 });
     expect(final.payments).toHaveLength(1);
     expect(final.amountDueCents).toBe(300);

@@ -3,11 +3,7 @@ import { MongoMemoryReplSet } from "mongodb-memory-server";
 
 let mongoServer;
 
-// applyPayment uses a session transaction (invoice update + ledger write
-// must commit/roll back together), and MongoDB only supports transactions
-// against a replica set — a single-node standalone instance rejects them.
-// A 1-member replica set gives us that for free while staying just as fast
-// and disposable as a standalone instance would have been.
+// A 1-member replica set is required since MongoDB transactions need a replica set.
 export async function connect() {
   mongoServer = await MongoMemoryReplSet.create({ replSet: { count: 1 } });
   await mongoose.connect(mongoServer.getUri());

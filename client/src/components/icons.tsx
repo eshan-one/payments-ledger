@@ -1,6 +1,4 @@
-// Small inline nav icons — stroke="currentColor" so they pick up the
-// active/inactive text color of whatever nav item renders them, no props.
-
+// Nav icons use stroke="currentColor" to pick up the active/inactive text color.
 const common = {
   width: 18,
   height: 18,

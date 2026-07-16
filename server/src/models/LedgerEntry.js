@@ -17,9 +17,7 @@ const lineSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// Immutable double-entry log: every document is one balanced transaction.
-// sum(debit lines) === sum(credit lines) is enforced in ledgerService before
-// insert — never edit or delete a LedgerEntry; reverse with a new entry.
+// Immutable double-entry log: never edit or delete, reverse with a new entry.
 const ledgerEntrySchema = new mongoose.Schema(
   {
     description: { type: String, required: true, trim: true },

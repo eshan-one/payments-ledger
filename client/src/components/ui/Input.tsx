@@ -9,10 +9,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   error?: boolean;
 }
 
-/**
- * A labelled input. The label is always associated via a generated id so the
- * field is keyboard/screen-reader accessible without callers wiring ids.
- */
+/** A labelled input; label is associated via a generated id for a11y. */
 export function Input({ label, hint, error, id, className, ...rest }: InputProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;

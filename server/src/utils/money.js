@@ -1,10 +1,7 @@
 // All money is handled as integer cents. Never use floats for currency math
 // (0.1 + 0.2 !== 0.3 in IEEE-754) — see CLAUDE.md "Money Rules".
 
-/**
- * Convert a decimal dollar amount (string or number, e.g. "12.34" or 12.3)
- * into integer cents (1234). Parses as a string to avoid float artifacts.
- */
+/** Convert a decimal dollar amount ("12.34" or 12.3) into integer cents (1234). */
 export function toCents(amount) {
   const str = String(amount).trim();
 

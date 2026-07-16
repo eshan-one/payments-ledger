@@ -35,18 +35,10 @@ const paymentSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// amountDueCents starts as the invoice total (computed from lineItems) and is
-// decremented as payments are applied — it always represents the REMAINING
-// balance. This is a deliberate exception to the "no stored balance" ledger
-// rule: it's the invoice's own state-machine field, not a derived account
-// balance duplicating the ledger.
+// amountDueCents is the remaining balance, decremented as payments are applied.
 const invoiceSchema = new mongoose.Schema(
   {
-    // Human-readable id (e.g. "INV-1001") instead of the default ObjectId —
-    // this is what's shown to users and looked up by, so it should read as
-    // an invoice number. Assigned by invoiceService.create via the Counter
-    // model; overriding the type to String disables Mongoose's automatic
-    // ObjectId generation.
+    // Human-readable id (e.g. "INV-1001"), assigned via the Counter model.
     _id: { type: String },
     lineItems: {
       type: [lineItemSchema],
@@ -66,9 +58,7 @@ const invoiceSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Unique across the whole collection (multikey index): the same paymentId
-// can never be recorded twice, on this invoice or any other. That is what
-// makes a duplicated webhook call for a payment safe to retry.
+// paymentId is unique collection-wide, making duplicate webhook calls safe to retry.
 invoiceSchema.index({ "payments.paymentId": 1 }, { unique: true, sparse: true });
 
 export const Invoice = mongoose.model("Invoice", invoiceSchema);
