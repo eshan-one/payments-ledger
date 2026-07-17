@@ -1,4 +1,5 @@
 import { ApiError } from "../utils/ApiError.js";
+import { logger } from "../utils/logger.js";
 
 /** Wrap an async route handler so a rejected promise reaches errorHandler. */
 export function asyncHandler(fn) {
@@ -13,6 +14,6 @@ export function errorHandler(err, req, res, next) {
     return res.status(err.status).json({ error: err.message });
   }
 
-  console.error(err);
+  logger.error(err);
   return res.status(500).json({ error: "Internal server error" });
 }
