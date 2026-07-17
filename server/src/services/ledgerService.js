@@ -1,12 +1,7 @@
 import { LedgerEntry } from "../models/LedgerEntry.js";
 import { ApiError } from "../utils/ApiError.js";
 
-/**
- * Enforce the double-entry invariant: every line is a positive integer
- * amount, there are at least 2 lines, and sum(debits) === sum(credits).
- * Throws 422 (business-rule violation) rather than 400 (malformed input) —
- * shape is valid, the accounting rule is what's broken.
- */
+/** Enforce the double-entry invariant: sum(debits) === sum(credits), >= 2 lines. */
 export function assertBalanced(lines) {
   if (!Array.isArray(lines) || lines.length < 2) {
     throw new ApiError(422, "A transaction requires at least 2 lines");
@@ -37,15 +32,7 @@ export function assertBalanced(lines) {
   }
 }
 
-/**
- * Validate and persist a double-entry transaction. The whole transaction is
- * one LedgerEntry document (lines[] embedded), so a single insert is
- * atomic — it is impossible to persist half of a double-entry write.
- *
- * Pass `session` to fold this insert into a caller's transaction (e.g.
- * invoiceService.applyPayment, which needs the invoice update and this
- * ledger write to commit or roll back together).
- */
+/** Validate and persist a double-entry transaction as one atomic LedgerEntry insert. */
 export async function postTransaction({ description, lines, invoiceId, paymentId, session }) {
   assertBalanced(lines);
 
@@ -64,11 +51,7 @@ export async function postTransaction({ description, lines, invoiceId, paymentId
   return entry;
 }
 
-/**
- * Derive an account's balance by aggregating every ledger line ever posted
- * against it — there is no stored balance field to drift or corrupt.
- * Credit lines add, debit lines subtract.
- */
+/** Derive an account's balance from ledger lines; credits add, debits subtract. */
 export async function getBalance(accountId) {
   const result = await LedgerEntry.aggregate([
     { $unwind: "$lines" },

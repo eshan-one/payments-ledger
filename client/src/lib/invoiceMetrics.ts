@@ -1,6 +1,4 @@
 // Pure aggregation helpers over Invoice[] for the dashboard/invoices views.
-// Nothing here talks to the network or touches component state — every
-// function is a plain reduction so it stays trivially testable.
 
 import type { Invoice, InvoiceStatus } from "../types.ts";
 
@@ -53,10 +51,7 @@ export interface MonthPoint {
   valueCents: number;
 }
 
-/**
- * Total payments collected per calendar month, for the trailing `months`
- * months (oldest first). Drives the dashboard's "collected over time" chart.
- */
+/** Total payments collected per calendar month, oldest first, for the trailing `months`. */
 export function collectedByMonth(invoices: Invoice[], months = 6): MonthPoint[] {
   const now = new Date();
   const buckets: MonthPoint[] = [];
@@ -90,11 +85,7 @@ export function isDueSoon(invoice: Invoice): boolean {
   return msUntilDue > 0 && msUntilDue < DUE_SOON_WINDOW_MS;
 }
 
-// The server never transitions an invoice to "overdue" — that status is
-// derived client-side from dueDate rather than stored, so it can never go
-// stale. isOverdue/displayStatus are the one place that derivation happens;
-// everywhere the UI shows or counts invoice status should go through
-// displayStatus rather than reading invoice.status directly.
+// "overdue" is derived client-side from dueDate; use displayStatus, not invoice.status.
 
 /** True when a sent invoice's due date has already passed. */
 export function isOverdue(invoice: Invoice): boolean {

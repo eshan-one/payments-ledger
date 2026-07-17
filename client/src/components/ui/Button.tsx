@@ -8,11 +8,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   size?: Size;
 }
 
-/**
- * The single button primitive. Variants/size map to CSS classes so we never
- * repeat inline styles; `type` defaults to "button" to avoid accidental form
- * submits (callers opt into "submit" explicitly).
- */
+/** The single button primitive; `type` defaults to "button" to avoid accidental submits. */
 export function Button({
   variant = "primary",
   size = "md",

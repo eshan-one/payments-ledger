@@ -22,10 +22,7 @@ const TYPE_LABELS: Record<AccountType, string> = {
   expense: "Expenses",
 };
 
-// invoiceService looks these up by exact name when posting a payment (see
-// server/src/services/invoiceService.js) — without both, "Apply payment"
-// fails with a 404. Surface a one-click way to create them instead of
-// making someone curl POST /api/accounts by hand.
+// Looked up by exact name when posting a payment; without both, "Apply payment" 404s.
 const REQUIRED_ACCOUNTS: { name: string; type: AccountType }[] = [
   { name: "Cash", type: "asset" },
   { name: "Accounts Receivable", type: "asset" },

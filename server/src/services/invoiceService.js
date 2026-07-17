@@ -6,8 +6,7 @@ import { postTransaction } from "./ledgerService.js";
 import { ApiError } from "../utils/ApiError.js";
 import { formatCents } from "../utils/money.js";
 
-// Invoice numbers start at INV-1001 — a $inc on a single counter document
-// is one atomic write, so concurrent creates can never collide on a number.
+// Invoice numbers start at INV-1001, assigned via an atomic counter $inc.
 const INVOICE_ID_PREFIX = "INV-";
 const INVOICE_ID_START = 1000;
 
@@ -20,15 +19,11 @@ async function nextInvoiceId() {
   return `${INVOICE_ID_PREFIX}${INVOICE_ID_START + counter.seq}`;
 }
 
-// Convention accounts a payment posts against. They must already exist
-// (created via POST /api/accounts, Milestone 1) — invoiceService looks them
-// up by name rather than storing account ids on the Invoice itself.
+// Convention accounts a payment posts against; must already exist.
 const CASH_ACCOUNT_NAME = "Cash";
 const ACCOUNTS_RECEIVABLE_ACCOUNT_NAME = "Accounts Receivable";
 
-// draft -> sent -> paid is the normal lifecycle. "overdue" is a legal target
-// but nothing transitions into it automatically (see spec: "skip automatic
-// overdue transition; leave it derivable from dueDate").
+// draft -> sent -> paid is the normal lifecycle; "overdue" is never entered automatically.
 const ALLOWED_TRANSITIONS = {
   draft: ["sent", "paid"],
   sent: ["paid", "overdue"],
@@ -60,10 +55,7 @@ function computeTotalCents(lineItems) {
   );
 }
 
-/**
- * Create an invoice. The total is always computed server-side from
- * lineItems — a client-sent total is never trusted.
- */
+/** Create an invoice; total is always computed server-side, never client-trusted. */
 export async function create({ lineItems, dueDate }) {
   const amountDueCents = computeTotalCents(lineItems);
   const _id = await nextInvoiceId();
@@ -80,8 +72,6 @@ export async function create({ lineItems, dueDate }) {
 }
 
 export async function getById(invoiceId) {
-  // _id is a plain String field (not ObjectId), so an unknown id just finds
-  // nothing rather than throwing a cast error — no format check needed.
   const invoice = await Invoice.findById(invoiceId);
   if (!invoice) {
     throw new ApiError(404, "Invoice not found");
@@ -94,36 +84,15 @@ export async function list() {
   return Invoice.find().sort({ createdAt: -1 });
 }
 
-// Read-modify-write on amountDueCents is unsafe: two concurrent payments can
-// both read the same remaining balance, both compute a valid new balance,
-// and both write it, so one payment's decrement silently overwrites the
-// other's — the classic lost-update race. MAX_APPLY_PAYMENT_ATTEMPTS bounds
-// the optimistic-concurrency retry loop below that closes that gap.
+// Bounds the optimistic-concurrency retry loop below (guards the lost-update race
+// where two concurrent payments both read/write the same remaining balance).
 const MAX_APPLY_PAYMENT_ATTEMPTS = 5;
 
 /**
- * Apply a payment to an invoice.
- * - Duplicate paymentId (already recorded on this invoice) is an idempotent
- *   no-op: return the current state, do not touch the ledger again.
- * - Overpayment (amountCents > remaining) is a 422 business-rule violation.
- * - Otherwise post a balanced ledger entry (debit Cash / credit Accounts
- *   Receivable) and record the payment, flipping status to "paid" once the
- *   remaining balance hits zero.
- *
- * Concurrency-safe by construction, two guards stacked together:
- * 1. Optimistic lock — the invoice update's filter re-asserts the exact
- *    amountDueCents this attempt read. If another payment changed that
- *    value in between, the filter no longer matches, the update is a
- *    no-op, and the outer loop retries against fresh state instead of
- *    clobbering it. That is what stops two simultaneous payments from
- *    both consuming the same remaining balance.
- * 2. Session transaction — the invoice update and the ledger write happen
- *    inside one `session.withTransaction`. Without this, a failure in the
- *    ledger write (bad account lookup, dropped connection, whatever) after
- *    the invoice was already updated would leave a payment recorded on the
- *    invoice with no matching LedgerEntry — silently breaking the
- *    double-entry invariant. The transaction makes the two writes commit
- *    or roll back together, so that split-brain state can't happen.
+ * Apply a payment to an invoice. Duplicate paymentId is an idempotent no-op;
+ * overpayment is a 422. Concurrency-safe via an optimistic lock (invoice
+ * update re-asserts the amountDueCents just read) plus a session transaction
+ * (invoice update + ledger write commit or roll back together).
  */
 export async function applyPayment(invoiceId, { paymentId, amountCents }) {
   if (!Number.isInteger(amountCents) || amountCents <= 0) {
@@ -169,10 +138,6 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
 
     try {
       await session.withTransaction(async () => {
-        // Optimistic lock: only succeeds if amountDueCents is still exactly
-        // what we just read. "payments.paymentId": { $ne } is defense-in-
-        // depth on top of the schema's unique index, for the case where two
-        // requests with the identical paymentId race each other.
         updated = await Invoice.findOneAndUpdate(
           {
             _id: invoiceId,
@@ -189,9 +154,7 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
         );
 
         if (!updated) {
-          // Lost the optimistic-lock race. Nothing to commit — abort this
-          // transaction (no-op) and let the outer loop retry against fresh
-          // state rather than failing the caller for a transient conflict.
+          // Lost the optimistic-lock race; outer loop retries against fresh state.
           return;
         }
 
@@ -211,10 +174,7 @@ export async function applyPayment(invoiceId, { paymentId, amountCents }) {
         });
       });
     } catch (err) {
-      // Concurrent duplicate paymentId raced us to the ledger's unique
-      // index — treat it the same as the idempotency check above: no-op,
-      // return current state. The transaction rolled back automatically,
-      // so the invoice update from this attempt never persisted either.
+      // Concurrent duplicate paymentId hit the ledger's unique index; treat as a no-op.
       if (err?.code === 11000) {
         duplicatePaymentRace = true;
       } else {

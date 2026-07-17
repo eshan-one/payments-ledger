@@ -1,6 +1,4 @@
-// Mirrors the Mongoose JSON shapes returned by the server (server/src/models).
-// Money fields are always integer cents — the `Cents` suffix makes the unit
-// explicit so a component can never accidentally treat one as dollars.
+// Mirrors the server's Mongoose JSON shapes. Money fields are always integer cents.
 
 export type AccountType = "asset" | "liability" | "equity" | "revenue" | "expense";
 

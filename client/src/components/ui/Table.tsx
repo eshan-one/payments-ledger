@@ -5,11 +5,7 @@ interface TableProps {
   className?: string;
 }
 
-/**
- * Thin wrapper that gives every table a consistent look and — critically —
- * keeps wide, number-heavy tables from forcing the page to scroll sideways by
- * letting the table itself scroll inside an overflow container.
- */
+/** Wraps tables in an overflow container so wide tables scroll, not the page. */
 export function Table({ children, className }: TableProps) {
   return (
     <div className="table-wrap">

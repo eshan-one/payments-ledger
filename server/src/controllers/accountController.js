@@ -6,11 +6,7 @@ import { asyncHandler } from "../middleware/errorHandler.js";
 import { ApiError } from "../utils/ApiError.js";
 import { formatCents } from "../utils/money.js";
 
-// Single-currency for now: currency isn't client-settable, so every account
-// gets the Account model's "USD" default. Aggregating balances (dashboard
-// totals, per-type summaries) sums amountCents across accounts with no
-// currency grouping — mixing currencies in would silently produce a wrong
-// total, not just a display quirk.
+// Single-currency only: balance aggregation sums amountCents with no currency grouping.
 const createAccountSchema = z.object({
   name: z.string().trim().min(1),
   type: z.enum(ACCOUNT_TYPES),

@@ -9,12 +9,7 @@ export function formatCents(cents: number): string {
   });
 }
 
-/**
- * Parse a dollar string typed into a form (e.g. "12.34") into integer cents.
- * Returns null for anything that isn't a valid non-negative amount with at
- * most 2 decimal places, so callers can show a validation error instead of
- * sending bad data to the server.
- */
+/** Parse a dollar string (e.g. "12.34") into integer cents, or null if invalid. */
 export function parseDollarsToCents(input: string): number | null {
   const trimmed = input.trim();
   if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return null;

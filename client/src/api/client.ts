@@ -13,10 +13,7 @@ export class ApiRequestError extends Error {
   }
 }
 
-/**
- * Central fetch wrapper: every caller gets typed data back, or this throws.
- * Components never see a raw Response or unknown JSON body.
- */
+/** Central fetch wrapper: every caller gets typed data back, or this throws. */
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, {
     ...init,
@@ -37,8 +34,7 @@ export function listAccounts(): Promise<Account[]> {
   return request<Account[]>("/api/accounts");
 }
 
-// Single-currency for now — the server ignores/always defaults to USD
-// regardless of what's sent, so the client doesn't offer a currency field.
+// Single-currency: server always defaults to USD, so no currency field here.
 export interface CreateAccountInput {
   name: string;
   type: Account["type"];
