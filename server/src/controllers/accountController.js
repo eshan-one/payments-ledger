@@ -30,7 +30,7 @@ export const listAccounts = asyncHandler(async (req, res) => {
 export const getAccountBalance = asyncHandler(async (req, res) => {
   const account = await getById(req.params.id);
 
-  const balanceCents = await getBalance(account._id);
+  const balanceCents = await getBalance(account._id, account.type);
   res.status(200).json({
     accountId: account._id,
     balanceCents,

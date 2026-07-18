@@ -91,9 +91,9 @@ describe("ledgerService.getBalance", () => {
       ],
     });
 
-    // getBalance's convention is credit-normal (credit adds, debit
-    // subtracts): cash was debited 1000 + 1000 and credited 400.
-    expect(await getBalance(cash._id)).toBe(400 - 1000 - 1000);
-    expect(await getBalance(revenue._id)).toBe(1000 + 1000 - 400);
+    // Cash is debit-normal (asset): debited 1000 + 1000, credited 400.
+    // Revenue is credit-normal: credited 1000 + 1000, debited 400.
+    expect(await getBalance(cash._id, cash.type)).toBe(1000 + 1000 - 400);
+    expect(await getBalance(revenue._id, revenue.type)).toBe(1000 + 1000 - 400);
   });
 });

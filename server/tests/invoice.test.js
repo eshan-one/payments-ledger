@@ -3,6 +3,7 @@ import { connect, clearDatabase, closeDatabase } from "./setup.js";
 import { createApp } from "../src/app.js";
 import { create as createAccount } from "../src/services/accountService.js";
 import { create as createInvoice, applyPayment } from "../src/services/invoiceService.js";
+import { getBalance } from "../src/services/ledgerService.js";
 import { ApiError } from "../src/utils/ApiError.js";
 
 const app = createApp();
@@ -20,10 +21,11 @@ afterAll(async () => {
 });
 
 async function seedAccounts() {
-  await Promise.all([
+  const [cash, receivable] = await Promise.all([
     createAccount({ name: "Cash", type: "asset" }),
     createAccount({ name: "Accounts Receivable", type: "asset" }),
   ]);
+  return { cash, receivable };
 }
 
 async function seedInvoice(amountDueCents = 1000) {
@@ -43,6 +45,19 @@ describe("invoiceService.applyPayment", () => {
     expect(updated.amountDueCents).toBe(600);
     expect(updated.status).toBe("sent");
     expect(updated.payments).toHaveLength(1);
+  });
+
+  it("moves Cash up and Accounts Receivable down by the payment amount (both debit-normal assets)", async () => {
+    const { cash, receivable } = await seedAccounts();
+    const invoice = await seedInvoice(1000);
+
+    // applyPayment posts: debit Cash, credit Accounts Receivable. Both accounts
+    // are type "asset" (debit-normal), so a debit should increase the balance
+    // and a credit should decrease it — the opposite of the credit-normal rule.
+    await applyPayment(invoice._id, { paymentId: "p1", amountCents: 400 });
+
+    expect(await getBalance(cash._id, cash.type)).toBe(400);
+    expect(await getBalance(receivable._id, receivable.type)).toBe(-400);
   });
 
   it("rejects an overpayment with a 422 ApiError", async () => {

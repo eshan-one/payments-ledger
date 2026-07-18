@@ -51,8 +51,18 @@ export async function postTransaction({ description, lines, invoiceId, paymentId
   return entry;
 }
 
-/** Derive an account's balance from ledger lines; credits add, debits subtract. */
-export async function getBalance(accountId) {
+// Double-entry bookkeeping splits accounts into two families with opposite
+// "normal" sides. Debit-normal accounts (asset, expense) grow with debits and
+// shrink with credits — e.g. a Cash debit is money coming in. Credit-normal
+// accounts (liability, equity, revenue) grow with credits and shrink with
+// debits — e.g. a Revenue credit is income recognized. Applying one sign
+// convention to both families silently inverts every debit-normal balance.
+const DEBIT_NORMAL_TYPES = new Set(["asset", "expense"]);
+
+/** Derive an account's balance from ledger lines, sign depending on accountType. */
+export async function getBalance(accountId, accountType) {
+  const increasingDirection = DEBIT_NORMAL_TYPES.has(accountType) ? "debit" : "credit";
+
   const result = await LedgerEntry.aggregate([
     { $unwind: "$lines" },
     { $match: { "lines.accountId": accountId } },
@@ -62,7 +72,7 @@ export async function getBalance(accountId) {
         balance: {
           $sum: {
             $cond: [
-              { $eq: ["$lines.direction", "credit"] },
+              { $eq: ["$lines.direction", increasingDirection] },
               "$lines.amountCents",
               { $multiply: ["$lines.amountCents", -1] },
             ],
