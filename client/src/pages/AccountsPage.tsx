@@ -129,7 +129,7 @@ export function AccountsPage() {
         {state.status === "ready" && <AccountsList rows={state.rows} />}
       </Card>
 
-      {state.status === "ready" && (
+      {state.status === "ready" && missingRequired.length === 0 && (
         <Card title="Add account" action={<span className="card__meta">Balances start at $0.00</span>}>
           <CreateAccountForm onCreated={() => void load()} />
         </Card>
