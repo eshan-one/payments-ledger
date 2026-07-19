@@ -1,3 +1,5 @@
+Readme · MD
+
 # Mini Payment Ledger & Invoice Service
 
 A small double-entry payment ledger + invoice service: a Node/Express/Mongoose
@@ -10,11 +12,13 @@ Core ideas:
 - **Double-entry ledger** — every payment posts one `LedgerEntry` with
   balanced debit/credit lines. Account balances are **derived** by
   aggregating ledger lines, never stored.
-- **Invoices** move `draft` → `sent` → `paid` as payments are applied against
-  them; totals are always computed server-side from line items.
+- **Invoices** move `draft` → `sent` → `paid` (with `sent` → `overdue` →
+  `paid` also allowed) as payments are applied against them; totals are
+  always computed server-side from line items.
 - **Idempotent payments** — a duplicate `paymentId` is a no-op, guarded at
   the application layer and by a unique DB index (handles a webhook firing
-  twice, or two concurrent requests).
+  twice — see "the chosen edge case" below for how _differing_ concurrent
+  payments are kept safe too).
 - **Money is integer cents** everywhere; decimals only appear at the UI edges.
 
 ## Prerequisites
@@ -93,10 +97,22 @@ landing at once). Two guards, stacked (`server/src/services/invoiceService.js`):
 2. **Session transaction** — the invoice update and the ledger write commit
    or roll back together, so a failure partway through can never leave a
    payment on the invoice with no matching `LedgerEntry`.
+   A duplicate `paymentId` is a no-op at three layers: an in-memory check, a
+   unique Mongo index, and a caught duplicate-key error if two identical
+   requests race into the write itself.
 
-A duplicate `paymentId` is a no-op at three layers: an in-memory check, a
-unique Mongo index, and a caught duplicate-key error if two identical
-requests race into the write itself.
+## Known issues
+
+- **Accounts Receivable doesn't reflect real outstanding balances.** Invoice
+  creation never posts a ledger entry — only `applyPayment()` does. So
+  Accounts Receivable is only ever _credited_ (by payments coming in), never
+  _debited_ (by invoices going out), which means a fully-paid invoice leaves
+  the balance permanently negative rather than back at $0. A correct
+  implementation would post `debit Accounts Receivable / credit Revenue`
+  when an invoice moves to `sent`, so a payment's later
+  `credit Accounts Receivable` brings the balance back to zero instead of
+  past it. (`Account.type` already includes `revenue`; it's just unused so
+  far.)
 
 ## Shortcuts taken
 
