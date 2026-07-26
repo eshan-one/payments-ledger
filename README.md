@@ -7,6 +7,7 @@ API with a React + TypeScript UI on top. Built as a scoped fintech hiring
 exercise, prioritizing **correctness of money handling > clean architecture >
 tests > UI polish**.
 
+
 Core ideas:
 
 - **Double-entry ledger** — every payment posts one `LedgerEntry` with
