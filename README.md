@@ -8,6 +8,7 @@ exercise, prioritizing **correctness of money handling > clean architecture >
 tests > UI polish**.
 
 
+
 Core ideas:
 
 - **Double-entry ledger** — every payment posts one `LedgerEntry` with
